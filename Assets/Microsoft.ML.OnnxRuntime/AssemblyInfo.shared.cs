@@ -1,14 +1,14 @@
 #if __XAMARIN__
-#if __IOS__
+#if (UNITY_IOS && !UNITY_EDITOR)
 [assembly: Foundation.LinkerSafe]
-#elif __ANDROID__
+#elif (UNITY_ANDROID && !UNITY_EDITOR)
 [assembly: Android.LinkerSafe]
 #endif
 #else
 // .net 6 
-#if __IOS__
+#if (UNITY_IOS && !UNITY_EDITOR)
 [assembly: System.Reflection.AssemblyMetadata ("IsTrimmable", "True")]
-#elif __ANDROID__
+#elif (UNITY_ANDROID && !UNITY_EDITOR)
 [assembly: global::System.Reflection.AssemblyMetadata("IsTrimmable", "True")]
 #endif
 #endif

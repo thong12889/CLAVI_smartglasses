@@ -427,10 +427,10 @@ namespace Microsoft.ML.OnnxRuntime
 
         internal class NativeLib
         {
-#if __ANDROID__
+#if (UNITY_ANDROID && !UNITY_EDITOR)
         // define the library name required for android
         internal const string DllName = "libonnxruntime.so";
-#elif __IOS__
+#elif (UNITY_IOS && !UNITY_EDITOR)
         // define the library name required for iOS
         internal const string DllName = "__Internal";
 #else
@@ -849,18 +849,18 @@ namespace Microsoft.ML.OnnxRuntime
         [DllImport(NativeLib.DllName, CharSet = CharSet.Ansi)]
         public static extern IntPtr /*(OrtStatus*)*/ OrtSessionOptionsAppendExecutionProvider_CPU(IntPtr /*(OrtSessionOptions*) */ options, int use_arena);
 
-#if __ANDROID__
+#if (UNITY_ANDROID && !UNITY_EDITOR)
         [DllImport(NativeLib.DllName, CharSet = CharSet.Ansi)]
         public static extern IntPtr /*(OrtStatus*)*/ OrtSessionOptionsAppendExecutionProvider_Nnapi(IntPtr /*(OrtSessionOptions*)*/ options, uint nnapi_flags);
 #endif
 
-#if __ENABLE_COREML__
-        // CoreML is available on iOS and macOS so we can't exclude based on __MOBILE__ && __IOS__
+#if (UNITY_IOS || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX)
+        // CoreML is available on iOS and macOS so we can't exclude based on ((UNITY_IOS || UNITY_ANDROID) && !UNITY_EDITOR) && (UNITY_IOS && !UNITY_EDITOR)
         [DllImport(NativeLib.DllName, CharSet = CharSet.Ansi)]
         public static extern IntPtr /*(OrtStatus*)*/ OrtSessionOptionsAppendExecutionProvider_CoreML(IntPtr /*(OrtSessionOptions*)*/ options, uint coreml_flags);
 #endif
 
-#if !__MOBILE__
+#if !((UNITY_IOS || UNITY_ANDROID) && !UNITY_EDITOR)
         // on non-mobile platforms any of these EPs are possible
         [DllImport(NativeLib.DllName, CharSet = CharSet.Ansi)]
         public static extern IntPtr /*(OrtStatus*)*/ OrtSessionOptionsAppendExecutionProvider_Dnnl(IntPtr /*(OrtSessionOptions*) */ options, int use_arena);

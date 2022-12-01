@@ -29,17 +29,18 @@ public class Clavi_object : UnityEngine.MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        var labelPath = UnityEngine.Application.dataPath + "/Labels/board_label.txt";
-        labelList = File.ReadAllLines(labelPath);
+        labelList = labelMap.text.Split('\n');
 
         RGBCamTexture = new NRRGBCamTexture();
         CaptureImage.texture = RGBCamTexture.GetTexture();
         RGBCamTexture.Play();
 
-        var modelPath = Path.Combine(UnityEngine.Application.streamingAssetsPath, "board.onnx");
+        BetterStreamingAssets.Initialize();
+        byte[] modelData = BetterStreamingAssets.ReadAllBytes("board.onnx");
         var option = new SessionOptions();
         option.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
-        session = new InferenceSession(modelPath, option);
+        option.AppendExecutionProvider_Nnapi(NnapiFlags.NNAPI_FLAG_CPU_DISABLED);
+        session = new InferenceSession(modelData, option);
     }
 
     // Update is called once per frame
@@ -52,7 +53,7 @@ public class Clavi_object : UnityEngine.MonoBehaviour
         else
         {
             Mat mat = OpenCvSharp.Unity.TextureToMat(RGBCamTexture.GetTexture());
-            //Process(mat);
+            Process(mat);
         }
 
     }

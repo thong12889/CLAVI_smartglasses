@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using System;
 using System.IO;
@@ -7,13 +6,15 @@ using UnityEngine.UI;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenCvSharp;
-using System.Threading.Tasks;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 public class ObjectDetection : MonoBehaviour
 {
-    public Texture2D tex;
+    //public Texture2D tex;
     public RawImage rawimage;
+    [SerializeField] TextAsset labelMap = null;
 
     private InferenceSession session;
 
@@ -25,22 +26,25 @@ public class ObjectDetection : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        var labelPath = Application.dataPath + "/Labels/board_label.txt";
-        labelList = File.ReadAllLines(labelPath);
+        labelList = labelMap.text.Split('\n');
 
-        //Mat image = OpenCvSharp.Unity.TextureToMat(tex);
-        webcamTexture = new WebCamTexture();
-        //rawimage.texture = webcamTexture;
+        webcamTexture = new WebCamTexture(imgSize.Width, imgSize.Height);
+        rawimage.texture = webcamTexture;
         webcamTexture.Play();
 
-        var modelPath = Path.Combine(Application.streamingAssetsPath, "board.onnx");
+        BetterStreamingAssets.Initialize();
+        byte[] model = BetterStreamingAssets.ReadAllBytes("board.onnx");
         var option = new SessionOptions();
         option.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
-        session = new InferenceSession(modelPath, option);
+        session = new InferenceSession(model, option);
     }
     void Update()
     {
-        if (webcamTexture.didUpdateThisFrame)
+        if (webcamTexture == null)
+        {
+            return;
+        }
+        else
         {
             Mat mat = OpenCvSharp.Unity.TextureToMat(webcamTexture);
             Process(mat);
@@ -48,7 +52,11 @@ public class ObjectDetection : MonoBehaviour
     }
     private void Process(Mat image)
     {
-        Mat imageFloat = image.Resize(imgSize);
+        Stopwatch watch = new Stopwatch();
+        watch.Start();
+
+        var imageResult = image.Clone();
+        Mat imageFloat = imageResult.Resize(imgSize);
         imageFloat.ConvertTo(imageFloat, MatType.CV_32FC1);
         var input = new DenseTensor<float>(MatToList(imageFloat), new[] { 1, 3, imgSize.Height, imgSize.Width });
 
@@ -87,8 +95,8 @@ public class ObjectDetection : MonoBehaviour
 
                     var confi = candidate[i][4];
 
-                    var dw = image.Width / (float)imgSize.Width;
-                    var dh = image.Height / (float)imgSize.Height;
+                    var dw = imageResult.Width / (float)imgSize.Width;
+                    var dh = imageResult.Height / (float)imgSize.Height;
 
                     var rescale_Xmin = candidate[i][0] * dw;
                     var rescale_Ymin = candidate[i][1] * dh;
@@ -96,7 +104,7 @@ public class ObjectDetection : MonoBehaviour
                     var rescale_Ymax = candidate[i][3] * dh;
 
                     //draw bounding box
-                    Cv2.Rectangle(image, new OpenCvSharp.Rect((int)rescale_Xmin, (int)rescale_Ymin, (int)(rescale_Xmax - rescale_Xmin), (int)(rescale_Ymax - rescale_Ymin)),
+                    Cv2.Rectangle(imageResult, new OpenCvSharp.Rect((int)rescale_Xmin, (int)rescale_Ymin, (int)(rescale_Xmax - rescale_Xmin), (int)(rescale_Ymax - rescale_Ymin)),
                         new Scalar(0, 255, 0), 5);
 
                     //draw label
@@ -106,14 +114,18 @@ public class ObjectDetection : MonoBehaviour
                     HersheyFonts font = HersheyFonts.HersheyDuplex;
                     int baseLine;
                     var textSize = Cv2.GetTextSize(result_text, font, scale, thickness, out baseLine);
-                    Cv2.Rectangle(image, new Point(rescale_Xmin + 4, rescale_Ymin + 4), new Point(rescale_Xmin + textSize.Width, rescale_Ymin + textSize.Height + 10),
+                    Cv2.Rectangle(imageResult, new Point(rescale_Xmin + 4, rescale_Ymin + 4), new Point(rescale_Xmin + textSize.Width, rescale_Ymin + textSize.Height + 10),
                         new Scalar(0, 0, 0), -1);
-                    Cv2.PutText(image, result_text, new Point(rescale_Xmin + 4, rescale_Ymin + textSize.Height + 4), font, scale,
+                    Cv2.PutText(imageResult, result_text, new Point(rescale_Xmin + 4, rescale_Ymin + textSize.Height + 4), font, scale,
                         new Scalar(255, 255, 255), thickness);
                 }
             }
         }
-        rawimage.texture = OpenCvSharp.Unity.MatToTexture(image);
+
+        watch.Stop();
+        var elapsedTime = watch.ElapsedMilliseconds;
+        UnityEngine.Debug.Log("Operation took: " + elapsedTime + " ms.");
+        rawimage.texture = OpenCvSharp.Unity.MatToTexture(imageResult);
     }
     private static List<List<float>> GetCandidate(float[] pred, int[] pred_dim, float pred_thresh = 0.5f)
     {
